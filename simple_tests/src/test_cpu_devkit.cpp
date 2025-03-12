@@ -47,7 +47,7 @@ TEST(depth_anything_test, ort_core_correctness)
 
   cv::Mat color_normalized_disp_pred;
   cv::applyColorMap(normalized_disp_pred, color_normalized_disp_pred, cv::COLORMAP_JET);
-  cv::imwrite("/workspace/test_data/lightstereo_result_color.png", color_normalized_disp_pred);
+  cv::imwrite("/workspace/test_data/depth_anything_result_color.png", color_normalized_disp_pred);
 }
 
 TEST(depth_anything_test, ort_core_speed)
@@ -97,7 +97,7 @@ TEST(depth_anything_test, ort_core_pipeline_correctness)
 
   cv::Mat color_normalized_disp_pred;
   cv::applyColorMap(normalized_disp_pred, color_normalized_disp_pred, cv::COLORMAP_JET);
-  cv::imwrite("/workspace/test_data/lightstereo_result_color.png", color_normalized_disp_pred);
+  cv::imwrite("/workspace/test_data/depth_anything_result_color.png", color_normalized_disp_pred);
 }
 
 

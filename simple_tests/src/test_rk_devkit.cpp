@@ -3,7 +3,7 @@
 #include "rknn_core/rknn_core.h"
 #include "tests/fps_counter.h"
 #include "detection_2d_util/detection_2d_util.h"
-#include "stereo_lightstereo/lightstereo.hpp"
+#include "mono_stereo_depth_anything/depth_anything.hpp"
 
 /**************************
 ****  rknn core test ****
@@ -13,58 +13,56 @@ using namespace inference_core;
 using namespace detection_2d;
 using namespace stereo;
 
-std::shared_ptr<BaseStereoMatchingModel> CreateLightStereoModel()
+std::shared_ptr<BaseMonoStereoModel> CreateModel()
 {
-  auto engine = CreateRknnInferCore(
-      "/workspace/models/lightstereo_s_sceneflow_general.rknn",
-      {{"left_img", RknnInputTensorType::RK_UINT8}, {"right_img", RknnInputTensorType::RK_UINT8}}, 5, 3);
-  auto preprocess_block = CreateCpuDetPreProcess({}, {}, false, false);
-  auto model            = stereo::CreateLightStereoModel(engine, preprocess_block, 256, 512,
-                                                         {"left_img", "right_img"}, {"disp_pred"});
+  auto engine = CreateRknnInferCore("/workspace/models/depth_anything_v2_vits.rknn", {{"images", RknnInputTensorType::RK_UINT8}}, 5, 3);
+  auto preprocess_block = CreateCpuDetPreProcess({123.675, 116.28, 103.53}, {58.395, 57.12, 57.375}, false, false);
+  auto model            = stereo::CreateDepthAnythingModel(engine, preprocess_block, 518, 518,
+                                                         {"images"}, {"depth"});
 
   return model;
 }
 
-std::tuple<cv::Mat, cv::Mat> ReadTestImages()
+std::tuple<cv::Mat> ReadTestImages()
 {
-  auto left  = cv::imread("/workspace/test_data/left.png");
-  auto right = cv::imread("/workspace/test_data/right.png");
+  auto image  = cv::imread("/workspace/test_data/left.png");
 
-  return {left, right};
+  return {image};
 }
 
-TEST(lightstereo_test, rknn_core_correctness)
+TEST(depth_anything_test, rknn_core_correctness)
 {
-  auto model         = CreateLightStereoModel();
-  auto [left, right] = ReadTestImages();
+  auto model         = CreateModel();
+  auto [image] = ReadTestImages();
 
-  cv::Mat disp;
-  model->ComputeDisp(left, right, disp);
+  cv::Mat depth;
+  model->ComputeDepth(image, depth);
 
   double minVal, maxVal;
-  cv::minMaxLoc(disp, &minVal, &maxVal);
+  cv::minMaxLoc(depth, &minVal, &maxVal);
   cv::Mat normalized_disp_pred;
-  disp.convertTo(normalized_disp_pred, CV_8UC1, 255.0 / (maxVal - minVal),
+  depth.convertTo(normalized_disp_pred, CV_8UC1, 255.0 / (maxVal - minVal),
                  -minVal * 255.0 / (maxVal - minVal));
+
 
   cv::Mat color_normalized_disp_pred;
   cv::applyColorMap(normalized_disp_pred, color_normalized_disp_pred, cv::COLORMAP_JET);
-  cv::imwrite("/workspace/test_data/lightstereo_result_color.png", color_normalized_disp_pred);
+  cv::imwrite("/workspace/test_data/depth_anything_result_color.png", color_normalized_disp_pred);
 }
 
-TEST(lightstereo_test, rknn_core_speed)
+TEST(depth_anything_test, rknn_core_speed)
 {
-  auto model         = CreateLightStereoModel();
-  auto [left, right] = ReadTestImages();
+  auto model         = CreateModel();
+  auto [image] = ReadTestImages();
 
   FPSCounter fps_counter;
   fps_counter.Start();
-  for (int i = 0; i < 1000; ++i)
+  for (int i = 0; i < 200; ++i)
   {
-    cv::Mat disp;
-    model->ComputeDisp(left, right, disp);
+    cv::Mat depth;
+    model->ComputeDepth(image, depth);
     fps_counter.Count(1);
-    if (i % 100 == 0)
+    if (i % 20 == 0)
     {
       LOG(WARNING) << "cur fps : " << fps_counter.GetFPS();
     }
@@ -73,14 +71,14 @@ TEST(lightstereo_test, rknn_core_speed)
 
 
 
-TEST(lightstereo_test, rknn_core_pipeline_correctness)
+TEST(depth_anything_test, rknn_core_pipeline_correctness)
 {
-  auto model         = CreateLightStereoModel();
+  auto model         = CreateModel();
   model->InitPipeline();
-  auto [left, right] = ReadTestImages();
+  auto [image] = ReadTestImages();
 
   auto async_func = [&]() {
-    return model->ComputeDispAsync(left, right);
+    return model->ComputeDepthAsync(image);
   };
 
   auto thread_fut = std::async(std::launch::async, async_func);
@@ -89,34 +87,34 @@ TEST(lightstereo_test, rknn_core_pipeline_correctness)
 
   CHECK(stereo_fut.valid());
 
-  cv::Mat disp = stereo_fut.get();
+  cv::Mat depth = stereo_fut.get();
 
   double minVal, maxVal;
-  cv::minMaxLoc(disp, &minVal, &maxVal);
+  cv::minMaxLoc(depth, &minVal, &maxVal);
   cv::Mat normalized_disp_pred;
-  disp.convertTo(normalized_disp_pred, CV_8UC1, 255.0 / (maxVal - minVal),
+  depth.convertTo(normalized_disp_pred, CV_8UC1, 255.0 / (maxVal - minVal),
                  -minVal * 255.0 / (maxVal - minVal));
 
   cv::Mat color_normalized_disp_pred;
   cv::applyColorMap(normalized_disp_pred, color_normalized_disp_pred, cv::COLORMAP_JET);
-  cv::imwrite("/workspace/test_data/lightstereo_result_color.png", color_normalized_disp_pred);
+  cv::imwrite("/workspace/test_data/depth_anything_result_color.png", color_normalized_disp_pred);
 }
 
 
-TEST(lightstereo_test, rknn_core_pipeline_speed)
+TEST(depth_anything_test, rknn_core_pipeline_speed)
 {
-  auto model         = CreateLightStereoModel();
+  auto model         = CreateModel();
   model->InitPipeline();
-  auto [left, right] = ReadTestImages();
+  auto [image] = ReadTestImages();
 
   deploy_core::BlockQueue<std::shared_ptr<std::future<cv::Mat>>> future_bq(100);
 
   auto func_push_data = [&]() {
     int index = 0;
-    while (index++ < 2000)
+    while (index++ < 200)
     {
       auto p_fut = std::make_shared<std::future<cv::Mat>>(
-          model->ComputeDispAsync(left.clone(), right.clone()));
+          model->ComputeDepthAsync(image.clone()));
       future_bq.BlockPush(p_fut);
     }
     future_bq.SetNoMoreInput();
@@ -133,7 +131,7 @@ TEST(lightstereo_test, rknn_core_pipeline_speed)
         break;
       output.value()->get();
       fps_counter.Count(1);
-      if (index ++ % 100 == 0) {
+      if (index ++ % 20 == 0) {
         LOG(WARNING) << "average fps: " << fps_counter.GetFPS();
       }
     }
