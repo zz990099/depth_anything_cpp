@@ -13,7 +13,7 @@
 
 | <img src="./assets/image.png" alt="1" width="500"> | <img src="./assets/depth_color.png" alt="1" width="500"> |
 |:----------------------------------------:|:----:|
-| **left image**  | **disp in color** |
+| **input image**  | **depth in color** |
 
 |  nvidia-3080-laptop   |   qps   |  cpu   |
 |:---------:|:---------:|:----------------:|
@@ -68,7 +68,7 @@ make -j
 
 ### Convert Model
 
-在docker容器内，运行模型转换脚本
+从[link](https://drive.google.com/drive/folders/1Bq0OS5VF7xYcu3oBl_rsGzjJ7u2IfHt2?usp=drive_link)下载模型，放到`/workspace/models`文件夹下，在docker容器内，运行模型转换脚本：
 ```bash
 cd /workspace
 bash tools/cvt_onnx2trt.sh
@@ -87,5 +87,5 @@ GLOG_minloglevel=1 ./bin/simple_tests --gtest_filter=*speed
 ## References
 
 - [DepthAnythingV1](https://github.com/LiheYoung/Depth-Anything)
-- [DepthAnythingV1](https://github.com/LiheYoung/Depth-Anything)
+- [DepthAnythingV2](https://github.com/DepthAnything/Depth-Anything-V2)
 - [EasyDeployTool](https://github.com/zz990099/EasyDeployTool)
